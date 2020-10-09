@@ -1,0 +1,44 @@
+kind: pipeline
+type: docker
+name: default
+steps:
+  - name: test
+    image: docker:dind
+    volumes:
+      - name: dockersock
+        path: /var/run/docker.sock
+    commands:
+      - docker build -t ****/linebot:1.2 ./
+      - docker tag ****/linebot:1.2 ****/linebot:latest
+      - docker push ****/linebot:1.2
+      - docker push ****/linebot:latest
+  
+  #teamsに通知
+  - name: notify
+    image: plugins/webhook
+    settings:
+      urls: link
+      content_type: application/json
+      template: |
+        {
+          "title": "Yamauchi New Version Published",
+          "text": "linbot",
+        }
+  
+  #SSHで接続
+  - name: deploy
+    image: appleboy/drone-ssh
+    settings:
+      host: host
+      username: name
+      password: password
+      port: 22
+      script:
+        - docker pull ****/linebot:latest
+        - docker-compose -f /pass/docker-compose.yml build bot
+        - docker-compose -f /pass/docker-compose.yml up -d bot
+
+volumes:
+- name: dockersock
+  host:
+    path: /var/run/docker.sock
